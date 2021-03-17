@@ -10,6 +10,8 @@ Tutorial app RoadRecorder
  ![](https://i.imgur.com/HglpwBSl.jpg). 
 
 Al terminar de grabar presionar STOP y el video se guardará automáticamente.
+
+
 3. Verificar si el video se guardó correctamente en la sección "Play" 
 
 ![](https://i.imgur.com/x7J3Hw5l.jpg)
