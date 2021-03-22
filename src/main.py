@@ -1,9 +1,9 @@
 import argparse
-import xml.etree.ElementTree as ET
 from CustomGoogleMapPlotter import CustomGoogleMapPlotter
 from index_calculation import get_index_image
 from heatmap_generation import generate_heatmap,plt,generate_heatmap_video
 from GMM_segmentation import os,cv2,np,segment_leaf_GMM
+from gpsFileReading import asignGPS2Frames
 
 # error message when image could not be read
 IMAGE_NOT_READ = 'IMAGE_NOT_READ'
@@ -64,22 +64,10 @@ if __name__ == '__main__':
         else:
             destination = folder
             
-            
-    #set up gps markers
-    tree = ET.parse(args.gps_source)
-    root = tree.getroot()
-    gps_info = {}
-    for position in root.findall('position'):
-        x = float(position.find('x_loc').text)
-        y = float(position.find('y_loc').text)
-        time = int(position.find('time').text)
-        gps_info[time] = (x,y)
-    
+   
     #process each frame
     heatmap_files = []
     agregateds = []
-    x_list = []
-    y_list= []
     for n,file in enumerate(files):
         try:
             # read image and segment leaf
@@ -116,13 +104,7 @@ if __name__ == '__main__':
             
             #generate an index for the entire frame
             agregated_index = np.sum(masked_index_image)/masked_index_image.count()
-            
-            #generate info for the GIS file
-            time_in_sec = n // int(args.frame_rate)
-            if gps_info[time_in_sec][0]!=0 and gps_info[time_in_sec][1]!=0:
-                agregateds.append(agregated_index)
-                x_list.append(gps_info[time_in_sec][0])
-                y_list.append(gps_info[time_in_sec][1])
+            if n>=int(args.frame_rate): agregateds.append(agregated_index) 
 
             # write the output
             if args.with_original:
@@ -130,8 +112,7 @@ if __name__ == '__main__':
             else:
                 cv2.imwrite(new_filename, output_image)
             print('Marker generated for image file: ', file)
-    
-    
+       
     #create heatmap video from heatmap image files
     img_list = []
     for filename in heatmap_files:
@@ -142,14 +123,18 @@ if __name__ == '__main__':
     video_filename = os.path.join(destination,'heatmap.avi')
     generate_heatmap_video(img_list, size, video_filename)
     
+    #get gps coordinates for each frame
+    x_array, y_array = asignGPS2Frames(args.gps_source,len(files),int(args.frame_rate))
+    
+    print("x, ",type(x_array),x_array)
+    print("y, ",type(y_array),y_array)
+    
     #create nitrogen map 
     agregateds = np.array(agregateds)
-    x_list_array = np.array(x_list)
-    y_list_array = np.array(y_list)
-    gmap = CustomGoogleMapPlotter(np.mean(x_list_array), np.mean(y_list_array), 12,
+    gmap = CustomGoogleMapPlotter(np.mean(x_array), np.mean(y_array), 12,
                                   "AIzaSyA7hF-pmJqAf26TmG90EaT2tG7wJuBb5rA", 'roadmap')
     gmap.apikey = "AIzaSyA7hF-pmJqAf26TmG90EaT2tG7wJuBb5rA"
-    gmap.color_scatter(x_list, y_list, agregateds, colormap=plt.cm.RdYlGn_r,size=2)
+    gmap.color_scatter(x_array.tolist(), y_array.tolist(), agregateds, colormap=plt.cm.RdYlGn_r,size=2)
     map_path = "mymap.html"
     map_path = os.path.join(destination, map_path)
     gmap.draw(map_path)
